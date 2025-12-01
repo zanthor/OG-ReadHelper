@@ -1,0 +1,9 @@
+## Interface: 11200
+## Title: OG-ReadHelper
+## Author: Gnuzmas
+## Version: 1.0.0
+## Notes: Raid companion addon for displaying in-game textures and visual aids
+## SavedVariables: OGRH_Read_SV
+
+OGRH_Core.lua
+OGRH_MainUI.lua
