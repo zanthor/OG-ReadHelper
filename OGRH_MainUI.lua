@@ -191,6 +191,10 @@ Main:SetScript("OnEvent", function()
       if OGRH_Read_ConsumeDisplay then
         OGRH_Read_ConsumeDisplay:Hide()
       end
+      -- Unload any custom modules
+      if OGRH_Read.UnloadAllModules then
+        OGRH_Read.UnloadAllModules()
+      end
     else
       -- In raid - request sync when joining raid or if no encounter set
       RequestSyncIfNeeded()
@@ -202,6 +206,10 @@ Main:SetScript("OnEvent", function()
       encounterBtn:SetText("Encounter")
       if OGRH_Read_ConsumeDisplay then
         OGRH_Read_ConsumeDisplay:Hide()
+      end
+      -- Unload any custom modules
+      if OGRH_Read.UnloadAllModules then
+        OGRH_Read.UnloadAllModules()
       end
     end
   end

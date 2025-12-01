@@ -4,6 +4,9 @@
 
 OGRH_Read = OGRH_Read or {}
 
+-- Get version from TOC file
+OGRH_Read.VERSION = GetAddOnMetadata("OG-ReadHelper", "Version") or "Unknown"
+
 -- Addon prefix for communication
 OGRH_Read.ADDON_PREFIX = "OGReadHelper"
 
@@ -20,6 +23,60 @@ function OGRH_Read.EnsureSV()
   end
 end
 
+-- ========================================
+-- MODULE SYSTEM
+-- ========================================
+OGRH_Read.Modules = OGRH_Read.Modules or {}
+OGRH_Read.LoadedModules = OGRH_Read.LoadedModules or {}
+
+-- Register a module (called by module files on load)
+function OGRH_Read.RegisterModule(module)
+  if not module or not module.id or not module.name then
+    return
+  end
+  
+  OGRH_Read.Modules[module.id] = module
+end
+
+-- Load modules for a specific encounter (from sync data)
+function OGRH_Read.LoadModulesForEncounter(moduleIds)
+  -- Unload all currently loaded modules first
+  OGRH_Read.UnloadAllModules()
+  
+  if not moduleIds or table.getn(moduleIds) == 0 then
+    return
+  end
+  
+  -- Load each module in order
+  for i, moduleId in ipairs(moduleIds) do
+    local module = OGRH_Read.Modules[moduleId]
+    if module and module.OnLoad then
+      module:OnLoad()
+      table.insert(OGRH_Read.LoadedModules, module)
+    end
+  end
+end
+
+-- Unload all currently loaded modules
+function OGRH_Read.UnloadAllModules()
+  for i, module in ipairs(OGRH_Read.LoadedModules) do
+    if module.OnUnload then
+      module:OnUnload()
+    end
+  end
+  OGRH_Read.LoadedModules = {}
+end
+
+-- Clean up all modules (called on addon unload)
+function OGRH_Read.CleanupModules()
+  OGRH_Read.UnloadAllModules()
+  for id, module in pairs(OGRH_Read.Modules) do
+    if module.OnCleanup then
+      module:OnCleanup()
+    end
+  end
+end
+
 -- Message output helper
 function OGRH_Read.Msg(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00OG-ReadHelper:|r " .. msg)
@@ -28,7 +85,7 @@ end
 -- Initialize addon
 local function OnLoad()
   OGRH_Read.EnsureSV() 
-  OGRH_Read.Msg("Loaded v" .. OGRH_Read_SV.version)
+  OGRH_Read.Msg("Loaded v" .. OGRH_Read.VERSION)
   
   -- Register addon message prefix (OGRH is the RaidHelper prefix we listen to)
   if not RegisterAddonMessagePrefix then
@@ -57,6 +114,20 @@ eventFrame:SetScript("OnEvent", function()
       local serialized = string.sub(message, 26)
       if OGRH_Read.HandleSyncResponse then
         OGRH_Read.HandleSyncResponse(serialized, sender)
+      end
+    -- Handle addon poll from RaidHelper
+    elseif prefix == "OGRH" and message == "ADDON_POLL" then
+      -- Don't respond to our own messages
+      local playerName = UnitName("player")
+      if sender == playerName then
+        return
+      end
+      
+      -- Respond with our version (no checksum for ReadHelper)
+      local numRaid = GetNumRaidMembers()
+      if numRaid > 0 then
+        local response = "READHELPER_POLL_RESPONSE;" .. OGRH_Read.VERSION
+        SendAddonMessage("OGRH", response, "RAID")
       end
     end
   end
@@ -315,6 +386,7 @@ function OGRH_Read.HandleSyncResponse(serialized, sender)
     encounter = data.encounter,
     announcement = data.announcement,
     consumes = data.consumes,
+    modules = data.modules,
     sender = sender
   }
   
@@ -326,6 +398,14 @@ function OGRH_Read.HandleSyncResponse(serialized, sender)
   -- Update consume display
   if OGRH_Read.UpdateConsumeDisplay then
     OGRH_Read.UpdateConsumeDisplay()
+  end
+  
+  -- Load custom modules for this encounter
+  if data.modules and OGRH_Read.LoadModulesForEncounter then
+    OGRH_Read.LoadModulesForEncounter(data.modules)
+  else
+    -- No modules for this encounter, unload any currently loaded
+    OGRH_Read.UnloadAllModules()
   end
 end
 
