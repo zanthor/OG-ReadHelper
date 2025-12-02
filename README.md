@@ -1,26 +1,16 @@
 # OG-ReadHelper
 
-Companion addon for OG-RaidHelper that displays visual guides and reference images for raid encounters and mechanics.
+Companion addon for OG-RaidHelper that displays visual guides and reference images for raid encounters and mechanics.  Seamlessly integrates with your raid leaders OG-RaidHelper to keep important information at your fingertips.
 
 ## Installation
 
 Place the `OG-ReadHelper` folder in your `Interface/AddOns` directory.
 
-## Usage
-
-Open the main window with:
-- `/ogreadhelper` or `/ogrh`
-
-## Adding Images
-
-Place `.tga` or `.blp` image files in the `Interface/AddOns/OG-ReadHelper/images/` folder. These can be referenced programmatically or displayed through the UI.
-
 ## Features
 
-- Display raid encounter diagrams
-- Show positioning guides
-- Visual reference for mechanics
-- Standalone operation (does not require OG-RaidHelper to be running)
+- Receive and display OG-RaidHelper details provided by your raid leadership.
+- Enhanced OG-RaidHelper specific C'thun encounter map.
+- Easily recall raid assignments for heals, tanking, raid marks, etc.
 
 ## Version
 
