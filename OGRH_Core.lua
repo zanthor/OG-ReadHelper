@@ -82,17 +82,26 @@ function OGRH_Read.Msg(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00OG-ReadHelper:|r " .. msg)
 end
 
+-- ========================================
+-- CONSUME HELPER WRAPPERS
+-- ========================================
+-- These functions make the Consume Helper module work with OGRH_Read namespace
+function OGRH_Read.ShowConsumeHelper()
+  if ConsumeHelper and ConsumeHelper.ShowSetup then
+    ConsumeHelper.ShowSetup()
+  end
+end
+
+function OGRH_Read.ShowManageConsumes()
+  if ConsumeHelper and ConsumeHelper.ShowManageConsumes then
+    ConsumeHelper.ShowManageConsumes()
+  end
+end
+
 -- Initialize addon
 local function OnLoad()
   OGRH_Read.EnsureSV() 
   OGRH_Read.Msg("Loaded v" .. OGRH_Read.VERSION)
-  
-  -- Register addon message prefix (OGRH is the RaidHelper prefix we listen to)
-  if not RegisterAddonMessagePrefix then
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000OG-ReadHelper:|r RegisterAddonMessagePrefix not available!")
-  else
-    RegisterAddonMessagePrefix("OGRH")
-  end
 end
 
 -- Event frame
@@ -237,124 +246,84 @@ function OGRH_Read.StyleButton(button)
   end)
 end
 
--- Show the RH menu with Monitor Consumes toggle
+-- Show the RH menu using OGST menu system
 function OGRH_Read.ShowMinimapMenu(sourceButton)
-  if not OGRH_Read_MinimapMenu then
-    local menu = CreateFrame("Frame", "OGRH_Read_MinimapMenu", UIParent)
-    menu:SetFrameStrata("FULLSCREEN_DIALOG")
-    menu:SetBackdrop({
-      bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-      edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-      tile = true,
-      tileSize = 16,
-      edgeSize = 16,
-      insets = {left = 4, right = 4, top = 4, bottom = 4}
+  if not OGRH_Read.Menu then
+    -- Check if OGST is available
+    if not OGST or not OGST.CreateStandardMenu then
+      OGRH_Read.Msg("Error: OGST library not loaded!")
+      return
+    end
+    
+    -- Create OGST menu
+    OGRH_Read.Menu = OGST.CreateStandardMenu({
+      name = "OGRH_Read_MinimapMenu"
     })
-    menu:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
-    menu:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
-    menu:SetWidth(160)
-    menu:SetHeight(80)
-    menu:Hide()
     
-    -- Close menu when clicking outside
-    menu:SetScript("OnShow", function()
-      if not menu.backdrop then
-        local backdrop = CreateFrame("Frame", nil, UIParent)
-        backdrop:SetFrameStrata("FULLSCREEN")
-        backdrop:SetAllPoints()
-        backdrop:EnableMouse(true)
-        backdrop:SetScript("OnMouseDown", function()
-          menu:Hide()
-        end)
-        menu.backdrop = backdrop
+    local menu = OGRH_Read.Menu
+    
+    -- Monitor Consumes toggle
+    menu.monitorConsumesItem = menu:AddItem({
+      text = "Monitor Consumes",
+      onClick = function()
+        OGRH_Read_SV.settings.monitorConsumes = not OGRH_Read_SV.settings.monitorConsumes
+        OGRH_Read.UpdateMonitorConsumesText()
       end
-      menu.backdrop:Show()
-    end)
+    })
     
-    menu:SetScript("OnHide", function()
-      if menu.backdrop then
-        menu.backdrop:Hide()
-      end
-    end)
+    -- Modules submenu
+    menu:AddItem({
+      text = "Modules",
+      submenu = {
+        {
+          text = "Consume Helper",
+          onClick = function()
+            if OGRH_Read.ShowManageConsumes then
+              OGRH_Read.ShowManageConsumes()
+            else
+              OGRH_Read.Msg("Consume Helper module not loaded.")
+            end
+          end
+        }
+      }
+    })
     
-    -- Title text
-    local titleText = menu:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleText:SetPoint("TOP", menu, "TOP", 0, -8)
-    titleText:SetText("OG-ReadHelper")
-    titleText:SetTextColor(1, 0.82, 0)
-    
-    -- Monitor Consumes toggle (text-based like RaidHelper)
-    local function CreateMenuItem(text, onClick, yPos)
-      local item = CreateFrame("Button", nil, menu)
-      item:SetWidth(150)
-      item:SetHeight(16)
-      item:SetPoint("TOP", menu, "TOP", 0, yPos)
-      
-      local bg = item:CreateTexture(nil, "BACKGROUND")
-      bg:SetAllPoints()
-      bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-      bg:SetVertexColor(0.2, 0.2, 0.2, 0)
-      item.bg = bg
-      
-      local fs = item:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      fs:SetPoint("LEFT", item, "LEFT", 8, 0)
-      fs:SetText(text)
-      fs:SetTextColor(1, 1, 1)
-      item.fs = fs
-      
-      item:SetScript("OnEnter", function()
-        bg:SetVertexColor(0.3, 0.3, 0.3, 0.5)
-      end)
-      
-      item:SetScript("OnLeave", function()
-        bg:SetVertexColor(0.2, 0.2, 0.2, 0)
-      end)
-      
-      item:SetScript("OnClick", onClick)
-      
-      return item
-    end
-    
-    local toggleItem = CreateMenuItem("Monitor Consumes", function()
-      OGRH_Read_SV.settings.monitorConsumes = not OGRH_Read_SV.settings.monitorConsumes
-      local item = menu.toggleItem
-      if item and item.fs then
-        if OGRH_Read_SV.settings.monitorConsumes then
-          item.fs:SetText("|cff00ff00Monitor Consumes|r")
-        else
-          item.fs:SetText("Monitor Consumes")
-        end
-      end
-      menu:Hide()
-    end, -28)
-    
-    toggleItem.UpdateText = function()
-      if OGRH_Read_SV.settings.monitorConsumes then
-        toggleItem.fs:SetText("|cff00ff00Monitor Consumes|r")
-      else
-        toggleItem.fs:SetText("Monitor Consumes")
-      end
-    end
-    
-    menu.toggleItem = toggleItem
-    menu.UpdateToggleText = toggleItem.UpdateText
+    -- Finalize menu to set proper height
+    menu:Finalize()
   end
   
-  local menu = getglobal("OGRH_Read_MinimapMenu")
-  if menu:IsShown() then
+  local menu = OGRH_Read.Menu
+  
+  -- Toggle menu visibility if already shown
+  if menu:IsVisible() then
     menu:Hide()
-  else
-    if menu.UpdateToggleText then
-      menu.UpdateToggleText()
-    end
-    if sourceButton then
-      menu:SetPoint("TOPLEFT", sourceButton, "BOTTOMLEFT", 0, -5)
+    return
+  end
+  
+  -- Update Monitor Consumes text before showing
+  OGRH_Read.UpdateMonitorConsumesText()
+  
+  -- Show menu
+  if sourceButton then
+    menu:SetPoint("TOPLEFT", sourceButton, "BOTTOMLEFT", 0, -5)
+  end
+  menu:Show()
+end
+
+-- Update Monitor Consumes menu item text
+function OGRH_Read.UpdateMonitorConsumesText()
+  if OGRH_Read.Menu and OGRH_Read.Menu.monitorConsumesItem and OGRH_Read.Menu.monitorConsumesItem.fs then
+    if OGRH_Read_SV and OGRH_Read_SV.settings and OGRH_Read_SV.settings.monitorConsumes then
+      OGRH_Read.Menu.monitorConsumesItem.fs:SetText("|cff00ff00Monitor Consumes|r")
     else
-      menu:SetPoint("CENTER", UIParent, "CENTER")
+      OGRH_Read.Menu.monitorConsumesItem.fs:SetText("Monitor Consumes")
     end
-    menu:Show()
   end
 end
+
+-- ========================================
+-- SYNC/COMMUNICATION
+-- ========================================
 
 -- Simple table deserialization (matches RaidHelper's format)
 function OGRH_Read.Deserialize(str)
